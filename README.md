@@ -6,6 +6,8 @@
 
 Mobile POS App untuk Pelaris.id omnichannel retail system (Android).
 
+**Repository:** [https://github.com/rejaldev/Pelaris.id-POS](https://github.com/rejaldev/Pelaris.id-POS)
+
 ## Features
 
 - **Real-time Sync** - WebSocket auto-refresh product & stock dari web dashboard
