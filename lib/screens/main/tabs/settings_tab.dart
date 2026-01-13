@@ -13,10 +13,7 @@ class SettingsTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Pengaturan',
-          style: TextStyle(fontSize: 18),
-        ),
+        title: const Text('Pengaturan', style: TextStyle(fontSize: 18)),
       ),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
@@ -239,11 +236,7 @@ class SettingsTab extends StatelessWidget {
             color: AppColors.primary.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(
-            Icons.store,
-            size: 20,
-            color: AppColors.primary,
-          ),
+          child: const Icon(Icons.store, size: 20, color: AppColors.primary),
         ),
         title: Text(
           currentCabang?.name ?? 'Tidak ada cabang',
@@ -261,10 +254,7 @@ class SettingsTab extends StatelessWidget {
                 'Logout untuk ganti cabang',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
-        trailing: const Icon(
-          Icons.check_circle,
-          color: AppColors.primary,
-        ),
+        trailing: const Icon(Icons.check_circle, color: AppColors.primary),
       ),
     );
   }

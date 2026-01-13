@@ -59,11 +59,13 @@ class AuthProvider extends ChangeNotifier {
       // Fetch cabang list for OWNER/MANAGER on init
       if (_user?.isOwnerOrManager == true) {
         await fetchCabangList();
-        
+
         // Restore previously selected cabang
         final savedCabangId = _authService.selectedCabangId;
         if (savedCabangId != null && _cabangList.isNotEmpty) {
-          final savedCabang = _cabangList.where((c) => c.id == savedCabangId).firstOrNull;
+          final savedCabang = _cabangList
+              .where((c) => c.id == savedCabangId)
+              .firstOrNull;
           if (savedCabang != null) {
             _selectedCabang = savedCabang;
             debugPrint('[AUTH] Restored selected cabang: ${savedCabang.name}');

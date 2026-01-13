@@ -181,7 +181,7 @@ class _BranchSelectionScreenState extends State<_BranchSelectionScreen> {
 
   Future<void> _loadAndShowBranchSelection() async {
     final authProvider = context.read<AuthProvider>();
-    
+
     // Fetch cabang list if needed
     if (authProvider.cabangList.isEmpty) {
       try {

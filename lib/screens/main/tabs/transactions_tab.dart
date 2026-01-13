@@ -37,10 +37,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Transaksi',
-          style: TextStyle(fontSize: 18),
-        ),
+        title: const Text('Transaksi', style: TextStyle(fontSize: 18)),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),

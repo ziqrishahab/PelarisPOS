@@ -50,7 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('[LOGIN] Owner/Manager detected, fetching cabang list...');
       try {
         await authProvider.fetchCabangList();
-        debugPrint('[LOGIN] Cabang list fetched: ${authProvider.cabangList.length} items');
+        debugPrint(
+          '[LOGIN] Cabang list fetched: ${authProvider.cabangList.length} items',
+        );
       } catch (e) {
         debugPrint('[LOGIN] Error fetching cabang list: $e');
       }
@@ -146,11 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFFFFFF),
-              Color(0xFFF1F5F9),
-              Color(0xFFE2E8F0),
-            ],
+            colors: [Color(0xFFFFFFFF), Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
           ),
         ),
         child: SafeArea(
@@ -158,7 +156,8 @@ class _LoginScreenState extends State<LoginScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height -
+                minHeight:
+                    MediaQuery.of(context).size.height -
                     MediaQuery.of(context).padding.top -
                     MediaQuery.of(context).padding.bottom,
               ),
@@ -169,10 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 80),
-                    Image.asset(
-                      'assets/images/login_form.png',
-                      height: 60,
-                    ),
+                    Image.asset('assets/images/login_form.png', height: 60),
                     const SizedBox(height: 8),
                     const Text(
                       'Bisnis Lancar, Untung Berlipat',
@@ -194,7 +190,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0x14EF4444),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0x33EF4444)),
+                              border: Border.all(
+                                color: const Color(0x33EF4444),
+                              ),
                             ),
                             child: Row(
                               children: [
@@ -221,7 +219,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.close_rounded, size: 18),
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 18,
+                                  ),
                                   onPressed: auth.clearError,
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
@@ -267,7 +268,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 borderSide: BorderSide(
-                                  color: AppColors.border.withValues(alpha: 0.3),
+                                  color: AppColors.border.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
@@ -297,7 +300,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: InputDecoration(
                               labelText: 'Password',
                               hintText: 'Masukkan password',
-                              prefixIcon: const Icon(Icons.lock_outline_rounded),
+                              prefixIcon: const Icon(
+                                Icons.lock_outline_rounded,
+                              ),
                               filled: true,
                               fillColor: AppColors.background,
                               border: OutlineInputBorder(
@@ -307,7 +312,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 borderSide: BorderSide(
-                                  color: AppColors.border.withValues(alpha: 0.3),
+                                  color: AppColors.border.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
@@ -368,11 +375,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 24),
                           Consumer<AuthProvider>(
                             builder: (context, auth, _) {
-                              final isLoading = auth.status == AuthStatus.loading;
+                              final isLoading =
+                                  auth.status == AuthStatus.loading;
                               return ElevatedButton(
                                 onPressed: isLoading ? null : _handleLogin,
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
