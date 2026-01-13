@@ -75,6 +75,7 @@ dev_dependencies:
   freezed: ^3.2.3
   json_serializable: ^6.11.2
   image: ^4.7.2
+  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -121,9 +122,18 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
+# Flutter Launcher Icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/icon.png"
+  adaptive_icon_background: "#00BFA5"  # turquoise dari gradient
+  adaptive_icon_foreground: "assets/images/icon.png"
+  min_sdk_android: 21
+
 # Flutter Native Splash
 flutter_native_splash:
-  color: "#2862ED"
+  color: "#F8FAFC"
   image: assets/images/ic_splash.png
   android: true
   ios: false
@@ -132,6 +142,6 @@ flutter_native_splash:
   
   # Android 12+ configuration
   android_12:
-    color: "#2862ED"
+    color: "#F8FAFC"
     image: assets/images/ic_splash.png
-    icon_background_color: "#2862ED"
+    icon_background_color: "#F8FAFC"

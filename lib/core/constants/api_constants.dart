@@ -1,6 +1,6 @@
 class ApiConstants {
   // Base URL - Production API (VPS)
-  static const String baseUrl = 'https://api.Pelaris.id.ziqrishahab.com/api';
+  static const String baseUrl = 'https://api-pelaris.ziqrishahab.com/api';
 
   // Auth endpoints
   static const String login = '/auth/login';

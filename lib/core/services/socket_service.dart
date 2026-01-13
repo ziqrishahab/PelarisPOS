@@ -9,7 +9,7 @@ class SocketService {
   bool _isConnected = false;
 
   // Socket.io server URL
-  static const String _serverUrl = 'https://api.Pelaris.id.ziqrishahab.com';
+  static const String _serverUrl = 'https://api-pelaris.ziqrishahab.com';
 
   bool get isConnected => _isConnected;
 

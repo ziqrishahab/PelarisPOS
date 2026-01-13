@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary colors
-  static const Color primary = Color(0xFF2862ED);
-  static const Color primaryLight = Color(0xFF4A7BF0);
-  static const Color primaryDark = Color(0xFF1B4BC9);
+  // Primary colors - Gray theme matching logo
+  static const Color primary = Color(0xFF3A4454);
+  static const Color primaryLight = Color(0xFF4F5B6E);
+  static const Color primaryDark = Color(0xFF2A323F);
+
+  // Navy accent (from logo)
+  static const Color navy = Color(0xFF1E3A5F);
 
   // Secondary colors
   static const Color secondary = Color(0xFF10B981);

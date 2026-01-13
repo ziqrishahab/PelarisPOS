@@ -6,12 +6,14 @@ import 'dart:convert';
 class AuthService {
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_data';
+  static const String _selectedCabangIdKey = 'selected_cabang_id';
 
   final FlutterSecureStorage _secureStorage;
   SharedPreferences? _prefs;
 
   User? _currentUser;
   String? _token;
+  String? _selectedCabangId;
 
   AuthService()
     : _secureStorage = const FlutterSecureStorage(aOptions: AndroidOptions());
@@ -35,6 +37,9 @@ class AuthService {
         await clearAuth();
       }
     }
+
+    // Load selected cabang ID for Owner/Manager
+    _selectedCabangId = _prefs?.getString(_selectedCabangIdKey);
   }
 
   // Get current token
@@ -51,6 +56,19 @@ class AuthService {
 
   // Get cabang ID
   String? get cabangId => _currentUser?.cabang?.id;
+
+  // Get selected cabang ID (for Owner/Manager)
+  String? get selectedCabangId => _selectedCabangId;
+
+  // Save selected cabang ID
+  Future<void> saveSelectedCabangId(String? cabangId) async {
+    _selectedCabangId = cabangId;
+    if (cabangId != null) {
+      await _prefs?.setString(_selectedCabangIdKey, cabangId);
+    } else {
+      await _prefs?.remove(_selectedCabangIdKey);
+    }
+  }
 
   // Save auth data after login
   Future<void> saveAuth(String token, User user) async {
@@ -78,8 +96,10 @@ class AuthService {
   Future<void> clearAuth() async {
     _token = null;
     _currentUser = null;
+    _selectedCabangId = null;
     await _secureStorage.delete(key: _tokenKey);
     await _prefs?.remove(_userKey);
+    await _prefs?.remove(_selectedCabangIdKey);
   }
 
   // Check user role

@@ -16,10 +16,10 @@ class LoadingScreen extends StatelessWidget {
           children: [
             // App Icon
             Image.asset('assets/images/flutter-loading.png', width: 300),
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
             // Loading Indicator
             const CircularProgressIndicator(
-              color: Color(0xFF2862ED),
+              color: Color(0xFF3A4454),
               strokeWidth: 3,
             ),
             if (message != null) ...[
@@ -56,7 +56,7 @@ class LoadingOverlay extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // App Icon
-            Image.asset('assets/images/flutter-loading.png', width: 200),
+            Image.asset('assets/images/flutter-loading.png', width: 180),
             const SizedBox(height: 24),
             // Loading Indicator
             const CircularProgressIndicator(

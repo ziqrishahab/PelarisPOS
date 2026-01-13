@@ -11,6 +11,8 @@ Mobile POS App untuk Pelaris.id omnichannel retail system (Android).
 ## Features
 
 - **Real-time Sync** - WebSocket auto-refresh product & stock dari web dashboard
+- **Multi-Branch Support** - Owner/Manager dapat pilih cabang, dengan persistensi pilihan
+- **Smart Login Flow** - Automatic branch selection saat app startup untuk multi-tenant users
 - Product search & barcode scanning (mobile_scanner)
 - Cart management dengan variant support
 - Multiple payment methods (Cash, Transfer, QRIS, Debit)
@@ -38,7 +40,8 @@ flutter run
 | Socket.IO Client 3.1.3 | Real-time WebSocket |
 | print_bluetooth_thermal | Thermal Printer |
 | mobile_scanner | Barcode/QR Scanner |
-| shared_preferences | Local Storage |
+| shared_preferences | Local Storage (cabang selection) |
+| flutter_secure_storage | Secure Token Storage |
 | auto_route | Navigation |
 
 ## Project Structure
@@ -109,6 +112,14 @@ Project di D: drive, pub cache di C: drive menyebabkan Kotlin compiler error saa
 
 ## Changelog
 
+### 2026-01-13
+- **Multi-Branch Support**: Added branch selection for Owner/Manager roles with SharedPreferences persistence
+- **Smart App Startup**: Automatic branch selection screen on first launch for multi-tenant users
+- **Login UI Update**: New login screen with login_form.png logo, keyboard-friendly layout without scrolling
+- **AppBar Consistency**: Unified gray AppBar styling across POS, Transactions, and Settings screens
+- **VPS Fix**: Added missing deviceSource column to transactions table
+- **Race Condition Fix**: Replaced delay-based wait with proper async await for cabang list fetch
+
 ### 2026-01-09
 - Added comprehensive unit tests (110 tests passing)
 - Test coverage: models, repositories, services, providers, formatters
@@ -117,17 +128,6 @@ Project di D: drive, pub cache di C: drive menyebabkan Kotlin compiler error saa
 ### 2026-01-07
 - Improved socket reconnection logic
 - Better error handling for offline mode
-
-### 2026-01-05
-- Added split payment support
-- Fixed thermal print formatting
-
-- Backend: Hono.js + PostgreSQL 18 + Prisma ORM
-- Frontend Dashboard: Next.js 16 + React 19
-- WebSocket: Socket.IO 4.8.1
-- Deployment: Ubuntu VPS dengan PM2 + Nginx
-
-## Changelog
 
 ### 2026-01-06
 - Updated all app icons to new Pelaris.id branding
@@ -141,3 +141,5 @@ Project di D: drive, pub cache di C: drive menyebabkan Kotlin compiler error saa
 - Optimized search behavior: filter at variant level, only show matching variants
 - Updated receipt printing: product name and variant info now display on separate lines
 - Added Product.copyWith method for variant filtering support
+- Added split payment support
+- Fixed thermal print formatting

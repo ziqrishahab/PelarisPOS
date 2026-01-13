@@ -45,20 +45,16 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
-    // Wait for cabang list to be fetched if user is Owner/Manager
+    // For Owner/Manager: ALWAYS fetch cabang list fresh after login
     if (authProvider.canSelectCabang) {
-      debugPrint('[LOGIN] Owner/Manager detected, waiting for cabang list...');
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Force refetch if empty
-      if (authProvider.cabangList.isEmpty) {
-        debugPrint('[LOGIN] Cabang list empty, forcing refetch...');
+      debugPrint('[LOGIN] Owner/Manager detected, fetching cabang list...');
+      try {
         await authProvider.fetchCabangList();
+        debugPrint('[LOGIN] Cabang list fetched: ${authProvider.cabangList.length} items');
+      } catch (e) {
+        debugPrint('[LOGIN] Error fetching cabang list: $e');
       }
     }
-
-    // Additional delay for data loading
-    await Future.delayed(const Duration(milliseconds: 300));
 
     if (!mounted) return;
 
@@ -144,79 +140,61 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
+      resizeToAvoidBottomInset: true,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFFFFFF),
+              Color(0xFFF1F5F9),
+              Color(0xFFE2E8F0),
+            ],
+          ),
+        ),
+        child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top -
+                    MediaQuery.of(context).padding.bottom,
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Logo & Title
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0x262862ED), Color(0x402862ED)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x332862ED),
-                            blurRadius: 20,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.store_rounded,
-                        size: 50,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Pelaris.id',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
+                    const SizedBox(height: 80),
+                    Image.asset(
+                      'assets/images/login_form.png',
+                      height: 60,
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Silakan login untuk melanjutkan',
+                      'Bisnis Lancar, Untung Berlipat',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
+                        fontWeight: FontWeight.w500,
                         color: AppColors.textSecondary,
+                        letterSpacing: 0.3,
                       ),
                     ),
-                    const SizedBox(height: 40),
-
-                    // Error message
+                    const SizedBox(height: 24),
                     Consumer<AuthProvider>(
                       builder: (context, auth, _) {
                         if (auth.errorMessage != null) {
                           return Container(
                             padding: const EdgeInsets.all(14),
-                            margin: const EdgeInsets.only(bottom: 20),
+                            margin: const EdgeInsets.only(bottom: 16),
                             decoration: BoxDecoration(
                               color: const Color(0x14EF4444),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0x33EF4444),
-                              ),
+                              border: Border.all(color: const Color(0x33EF4444)),
                             ),
                             child: Row(
                               children: [
@@ -243,10 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    size: 18,
-                                  ),
+                                  icon: const Icon(Icons.close_rounded, size: 18),
                                   onPressed: auth.clearError,
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
@@ -259,8 +234,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         return const SizedBox.shrink();
                       },
                     ),
-
-                    // Login card
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
@@ -277,7 +250,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Email field
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
@@ -295,9 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 borderSide: BorderSide(
-                                  color: AppColors.border.withValues(
-                                    alpha: 0.3,
-                                  ),
+                                  color: AppColors.border.withValues(alpha: 0.3),
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
@@ -319,8 +289,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                           ),
                           const SizedBox(height: 16),
-
-                          // Password field
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
@@ -329,9 +297,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: InputDecoration(
                               labelText: 'Password',
                               hintText: 'Masukkan password',
-                              prefixIcon: const Icon(
-                                Icons.lock_outline_rounded,
-                              ),
+                              prefixIcon: const Icon(Icons.lock_outline_rounded),
                               filled: true,
                               fillColor: AppColors.background,
                               border: OutlineInputBorder(
@@ -341,9 +307,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 borderSide: BorderSide(
-                                  color: AppColors.border.withValues(
-                                    alpha: 0.3,
-                                  ),
+                                  color: AppColors.border.withValues(alpha: 0.3),
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
@@ -374,8 +338,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                           ),
                           const SizedBox(height: 12),
-
-                          // Remember me
                           Row(
                             children: [
                               SizedBox(
@@ -404,18 +366,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           const SizedBox(height: 24),
-
-                          // Login button
                           Consumer<AuthProvider>(
                             builder: (context, auth, _) {
-                              final isLoading =
-                                  auth.status == AuthStatus.loading;
+                              final isLoading = auth.status == AuthStatus.loading;
                               return ElevatedButton(
                                 onPressed: isLoading ? null : _handleLogin,
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
@@ -443,9 +400,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 32),
-
-                    // Footer
+                    const SizedBox(height: 40),
                     const Text(
                       'Pelaris.id v1.0.0',
                       textAlign: TextAlign.center,
@@ -454,6 +409,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppColors.textLight,
                       ),
                     ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),

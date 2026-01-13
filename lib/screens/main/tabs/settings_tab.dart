@@ -13,13 +13,9 @@ class SettingsTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.settings, size: 24),
-            SizedBox(width: 10),
-            Text('Pengaturan', style: TextStyle(fontSize: 18)),
-          ],
+        title: const Text(
+          'Pengaturan',
+          style: TextStyle(fontSize: 18),
         ),
       ),
       body: Consumer<AuthProvider>(

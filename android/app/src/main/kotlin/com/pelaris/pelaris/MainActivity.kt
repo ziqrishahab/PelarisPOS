@@ -1,4 +1,4 @@
-package com.Pelaris.id.Pelaris.id
+package com.pelaris.pelaris
 
 import io.flutter.embedding.android.FlutterActivity
 

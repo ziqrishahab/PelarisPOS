@@ -82,14 +82,17 @@ class _PosScreenState extends State<PosScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.point_of_sale, size: 24),
-          const SizedBox(width: 8),
-          const Text('Pelaris.id'),
-        ],
+      backgroundColor: AppColors.primary,
+      elevation: 0,
+      title: const Text(
+        'Pelaris.id',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
+        ),
       ),
+      centerTitle: false,
     );
   }
 

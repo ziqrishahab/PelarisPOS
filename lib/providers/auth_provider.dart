@@ -59,6 +59,16 @@ class AuthProvider extends ChangeNotifier {
       // Fetch cabang list for OWNER/MANAGER on init
       if (_user?.isOwnerOrManager == true) {
         await fetchCabangList();
+        
+        // Restore previously selected cabang
+        final savedCabangId = _authService.selectedCabangId;
+        if (savedCabangId != null && _cabangList.isNotEmpty) {
+          final savedCabang = _cabangList.where((c) => c.id == savedCabangId).firstOrNull;
+          if (savedCabang != null) {
+            _selectedCabang = savedCabang;
+            debugPrint('[AUTH] Restored selected cabang: ${savedCabang.name}');
+          }
+        }
       }
     } else {
       _status = AuthStatus.unauthenticated;
@@ -178,6 +188,9 @@ class AuthProvider extends ChangeNotifier {
   void selectCabang(Cabang cabang) {
     if (_user?.isOwnerOrManager == true) {
       _selectedCabang = cabang;
+      // Persist the selection
+      _authService.saveSelectedCabangId(cabang.id);
+      debugPrint('[AUTH] Selected and saved cabang: ${cabang.name}');
       notifyListeners();
     }
   }

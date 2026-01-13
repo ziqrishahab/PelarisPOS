@@ -15,6 +15,7 @@ import 'data/api/api_client.dart';
 import 'providers/providers.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/pos/pos_screen.dart';
+import 'widgets/branch_selection_modal.dart';
 
 void main() async {
   // Wrap everything in runZonedGuarded for uncaught errors
@@ -105,6 +106,11 @@ class PelarisApp extends StatelessWidget {
 
             // Navigate based on auth status
             if (auth.isAuthenticated) {
+              // For Owner/Manager: check if cabang is selected
+              if (auth.canSelectCabang && auth.cabangId == null) {
+                // Need to select cabang first
+                return const _BranchSelectionScreen();
+              }
               return const PosScreen();
             }
             return const LoginScreen();
@@ -142,12 +148,104 @@ class _SplashScreenState extends State<_SplashScreen> {
           children: [
             // App Icon
             Image.asset('assets/images/flutter-loading.png', width: 300),
-            const SizedBox(height: 48),
+            const SizedBox(height: 32),
             // Loading Indicator
             const CircularProgressIndicator(
-              color: Color(0xFF2862ED),
+              color: Color(0xFF3A4454),
               strokeWidth: 3,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BranchSelectionScreen extends StatefulWidget {
+  const _BranchSelectionScreen();
+
+  @override
+  State<_BranchSelectionScreen> createState() => _BranchSelectionScreenState();
+}
+
+class _BranchSelectionScreenState extends State<_BranchSelectionScreen> {
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAndShowBranchSelection();
+    });
+  }
+
+  Future<void> _loadAndShowBranchSelection() async {
+    final authProvider = context.read<AuthProvider>();
+    
+    // Fetch cabang list if needed
+    if (authProvider.cabangList.isEmpty) {
+      try {
+        await authProvider.fetchCabangList();
+      } catch (e) {
+        debugPrint('[BRANCH] Error fetching cabang list: $e');
+      }
+    }
+
+    setState(() => _isLoading = false);
+
+    if (!mounted) return;
+
+    // Show branch selection modal
+    if (authProvider.cabangList.isNotEmpty) {
+      final selectedBranch = await BranchSelectionModal.show(
+        context,
+        branches: authProvider.cabangList,
+        selectedBranch: null,
+        canDismiss: false,
+        title: 'Pilih Cabang',
+        subtitle: 'Pilih cabang untuk transaksi hari ini',
+      );
+
+      if (selectedBranch != null && mounted) {
+        authProvider.selectCabang(selectedBranch);
+      } else if (mounted) {
+        // User cancelled - logout
+        await authProvider.logout();
+      }
+    } else {
+      // No branches available
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tidak ada cabang tersedia. Hubungi administrator.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset('assets/images/flutter-loading.png', width: 200),
+            const SizedBox(height: 32),
+            if (_isLoading) ...[
+              const CircularProgressIndicator(
+                color: Color(0xFF3A4454),
+                strokeWidth: 3,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Memuat data cabang...',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
           ],
         ),
       ),
