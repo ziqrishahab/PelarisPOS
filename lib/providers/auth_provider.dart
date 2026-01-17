@@ -4,6 +4,7 @@ import '../data/repositories/repositories.dart';
 import '../data/services/auth_service.dart';
 import '../data/api/api_client.dart';
 import '../core/services/sentry_service.dart';
+import '../core/services/socket_service.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
@@ -56,6 +57,13 @@ class AuthProvider extends ChangeNotifier {
       _user = _authService.currentUser;
       _status = AuthStatus.authenticated;
 
+      // Initialize socket with stored token
+      final token = await _authService.getToken();
+      if (token != null) {
+        SocketService().setAuthToken(token);
+        SocketService().connect();
+      }
+
       // Fetch cabang list for OWNER/MANAGER on init
       if (_user?.isOwnerOrManager == true) {
         await fetchCabangList();
@@ -101,6 +109,10 @@ class AuthProvider extends ChangeNotifier {
       _user = response.user;
       _status = AuthStatus.authenticated;
 
+      // Initialize socket connection with auth token
+      SocketService().setAuthToken(response.token);
+      SocketService().connect();
+
       // Set Sentry user context
       SentryService.setUser(
         id: response.user.id,
@@ -138,8 +150,14 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authRepository.logout();
     } finally {
+      // Disconnect socket on logout
+      SocketService().setAuthToken(null);
+      SocketService().disconnect();
+
       await _authService.logout();
       _user = null;
+      _selectedCabang = null;
+      _cabangList = [];
       _status = AuthStatus.unauthenticated;
       SentryService.clearUser();
       SentryService.addBreadcrumb(message: 'User logged out', category: 'auth');

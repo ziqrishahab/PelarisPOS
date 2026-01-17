@@ -683,10 +683,19 @@ class _TransactionCard extends StatelessWidget {
   }
 }
 
-/// Return reason enum
-enum ReturnReason { damaged, wrongItem, notAsDescribed, customerRequest, other }
+/// Return reason enum - matches backend ReturnReason
+enum ReturnReasonType {
+  // Return (Refund)
+  customerRequest,
+  other,
+  // Exchange
+  wrongSize,
+  wrongItem,
+  defective,
+  expired,
+}
 
-/// Return bottom sheet widget
+/// Return bottom sheet widget with full features
 class _ReturnBottomSheet extends StatefulWidget {
   final Transaction transaction;
 
@@ -697,23 +706,143 @@ class _ReturnBottomSheet extends StatefulWidget {
 }
 
 class _ReturnBottomSheetState extends State<_ReturnBottomSheet> {
+  // Data
   final Map<String, int> _returnQuantities = {};
-  ReturnReason _selectedReason = ReturnReason.damaged;
+  Map<String, ReturnableItem> _returnableItems = {};
+  ReturnSettings? _settings;
+
+  // Form state
+  ReturnReasonType _selectedReason = ReturnReasonType.customerRequest;
   final _notesController = TextEditingController();
+  final _reasonDetailController = TextEditingController();
+  bool _managerOverride = false;
+
+  // Exchange state
+  final Map<String, String> _exchangeVariants =
+      {}; // original variantId -> new variantId
+
+  // UI state
+  bool _isLoading = true;
   bool _isSubmitting = false;
+  String? _errorMessage;
+  bool _isOverdue = false;
+
+  late ReturnRepository _returnRepo;
 
   @override
   void initState() {
     super.initState();
-    // Initialize all quantities to 0
-    for (final item in widget.transaction.items) {
-      _returnQuantities[item.productVariantId] = 0;
+    _initRepository();
+    _loadData();
+  }
+
+  void _initRepository() {
+    final authService = AuthService();
+    final apiClient = ApiClient.getInstance(authService);
+    _returnRepo = ReturnRepository(apiClient);
+  }
+
+  Future<void> _loadData() async {
+    try {
+      print('[Return] Loading data for transaction: ${widget.transaction.id}');
+
+      // Load settings first
+      ReturnSettings settings;
+      try {
+        settings = await _returnRepo.getReturnSettings();
+        print(
+          '[Return] Settings loaded: returnEnabled=${settings.returnEnabled}',
+        );
+      } catch (e) {
+        print('[Return] Failed to load settings: $e');
+        // Default settings if failed
+        settings = ReturnSettings(
+          returnEnabled: true,
+          returnDeadlineDays: 7,
+          returnRequiresApproval: true,
+          exchangeEnabled: false,
+        );
+      }
+
+      // Load returnable quantities
+      ReturnableResponse returnable;
+      try {
+        returnable = await _returnRepo.getReturnableQuantities(
+          widget.transaction.id,
+        );
+        print('[Return] Returnable loaded: ${returnable.items.length} items');
+      } catch (e) {
+        print('[Return] Failed to load returnable: $e');
+        // Build from transaction items if API fails
+        returnable = ReturnableResponse(
+          transactionId: widget.transaction.id,
+          items: widget.transaction.items
+              .map(
+                (item) => ReturnableItem(
+                  productVariantId: item.productVariantId,
+                  productName: item.productName,
+                  variantInfo: item.variantInfo,
+                  originalQty: item.quantity,
+                  returnedQty: 0,
+                  returnableQty: item.quantity,
+                  price: item.price,
+                ),
+              )
+              .toList(),
+          hasFullyReturned: false,
+        );
+      }
+
+      // Check if return is enabled
+      if (!settings.returnEnabled) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Fitur return tidak diaktifkan';
+        });
+        return;
+      }
+
+      // Check if all items already returned
+      if (returnable.hasFullyReturned) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Semua item sudah diretur';
+        });
+        return;
+      }
+
+      // Check overdue
+      final transactionDate = widget.transaction.createdAt;
+      final deadline = transactionDate.add(
+        Duration(days: settings.returnDeadlineDays),
+      );
+      final isOverdue = DateTime.now().isAfter(deadline);
+
+      // Build returnable items map
+      final returnableMap = <String, ReturnableItem>{};
+      for (final item in returnable.items) {
+        returnableMap[item.productVariantId] = item;
+        _returnQuantities[item.productVariantId] = 0;
+      }
+
+      setState(() {
+        _settings = settings;
+        _returnableItems = returnableMap;
+        _isOverdue = isOverdue;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal memuat data: ${e.toString()}';
+      });
     }
   }
 
   @override
   void dispose() {
     _notesController.dispose();
+    _reasonDetailController.dispose();
     super.dispose();
   }
 
@@ -730,50 +859,104 @@ class _ReturnBottomSheetState extends State<_ReturnBottomSheet> {
     return _returnQuantities.values.any((qty) => qty > 0);
   }
 
-  String _getReasonLabel(ReturnReason reason) {
+  bool get _isExchangeReason {
+    return [
+      ReturnReasonType.wrongSize,
+      ReturnReasonType.wrongItem,
+      ReturnReasonType.defective,
+      ReturnReasonType.expired,
+    ].contains(_selectedReason);
+  }
+
+  String _getReasonLabel(ReturnReasonType reason) {
     switch (reason) {
-      case ReturnReason.damaged:
-        return 'Barang Rusak';
-      case ReturnReason.wrongItem:
-        return 'Salah Kirim';
-      case ReturnReason.notAsDescribed:
-        return 'Tidak Sesuai Deskripsi';
-      case ReturnReason.customerRequest:
-        return 'Permintaan Pelanggan';
-      case ReturnReason.other:
+      case ReturnReasonType.customerRequest:
+        return 'Permintaan Customer';
+      case ReturnReasonType.other:
         return 'Lainnya';
+      case ReturnReasonType.wrongSize:
+        return 'Salah Ukuran (Tukar Varian)';
+      case ReturnReasonType.wrongItem:
+        return 'Salah Barang (Tukar Produk)';
+      case ReturnReasonType.defective:
+        return 'Barang Rusak/Cacat (Ganti Baru)';
+      case ReturnReasonType.expired:
+        return 'Kadaluarsa (Ganti Baru)';
     }
   }
 
-  String _getReasonValue(ReturnReason reason) {
+  String _getReasonValue(ReturnReasonType reason) {
     switch (reason) {
-      case ReturnReason.damaged:
-        return 'DAMAGED';
-      case ReturnReason.wrongItem:
-        return 'WRONG_ITEM';
-      case ReturnReason.notAsDescribed:
-        return 'NOT_AS_DESCRIBED';
-      case ReturnReason.customerRequest:
+      case ReturnReasonType.customerRequest:
         return 'CUSTOMER_REQUEST';
-      case ReturnReason.other:
+      case ReturnReasonType.other:
         return 'OTHER';
+      case ReturnReasonType.wrongSize:
+        return 'WRONG_SIZE';
+      case ReturnReasonType.wrongItem:
+        return 'WRONG_ITEM';
+      case ReturnReasonType.defective:
+        return 'DEFECTIVE';
+      case ReturnReasonType.expired:
+        return 'EXPIRED';
     }
+  }
+
+  List<ReturnReasonType> get _availableReasons {
+    final reasons = <ReturnReasonType>[
+      ReturnReasonType.customerRequest,
+      ReturnReasonType.other,
+    ];
+
+    if (_settings?.exchangeEnabled == true) {
+      reasons.addAll([
+        ReturnReasonType.wrongSize,
+        ReturnReasonType.wrongItem,
+        ReturnReasonType.defective,
+        ReturnReasonType.expired,
+      ]);
+    }
+
+    return reasons;
   }
 
   Future<void> _submitReturn() async {
     if (!_hasItemsSelected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pilih minimal 1 item untuk diretur')),
+      _showError('Pilih minimal 1 item untuk diretur');
+      return;
+    }
+
+    // Check overdue with manager override
+    if (_isOverdue && !_managerOverride) {
+      _showError(
+        'Return sudah melewati batas waktu. Aktifkan override manager untuk melanjutkan.',
       );
       return;
+    }
+
+    // For exchange, validate exchange items are selected
+    if (_isExchangeReason && _selectedReason == ReturnReasonType.wrongSize) {
+      final selectedItems = widget.transaction.items.where(
+        (item) => (_returnQuantities[item.productVariantId] ?? 0) > 0,
+      );
+
+      for (final item in selectedItems) {
+        if (_exchangeVariants[item.productVariantId] == null) {
+          _showError('Pilih varian pengganti untuk semua item');
+          return;
+        }
+      }
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      final authService = AuthService();
-      final apiClient = ApiClient.getInstance(authService);
-      final returnRepo = ReturnRepository(apiClient);
+      final authProvider = context.read<AuthProvider>();
+      final cabangId = authProvider.cabangId;
+
+      if (cabangId == null || cabangId.isEmpty) {
+        throw Exception('Cabang tidak ditemukan');
+      }
 
       final items = widget.transaction.items
           .where((item) => (_returnQuantities[item.productVariantId] ?? 0) > 0)
@@ -786,19 +969,52 @@ class _ReturnBottomSheetState extends State<_ReturnBottomSheet> {
           )
           .toList();
 
-      await returnRepo.createReturn(
+      // Build exchange items for WRONG_SIZE or DEFECTIVE/EXPIRED
+      List<ExchangeItem>? exchangeItems;
+      if (_isExchangeReason) {
+        if (_selectedReason == ReturnReasonType.wrongSize) {
+          exchangeItems = items.map((item) {
+            final newVariantId = _exchangeVariants[item.productVariantId];
+            return ExchangeItem(
+              productVariantId: newVariantId ?? item.productVariantId,
+              quantity: item.quantity,
+            );
+          }).toList();
+        } else if (_selectedReason == ReturnReasonType.defective ||
+            _selectedReason == ReturnReasonType.expired) {
+          // For defective/expired, exchange with same product (new unit)
+          exchangeItems = items.map((item) {
+            return ExchangeItem(
+              productVariantId: item.productVariantId,
+              quantity: item.quantity,
+            );
+          }).toList();
+        }
+      }
+
+      await _returnRepo.createReturn(
         transactionId: widget.transaction.id,
+        cabangId: cabangId,
         reason: _getReasonValue(_selectedReason),
         items: items,
+        reasonDetail: _reasonDetailController.text.isNotEmpty
+            ? _reasonDetailController.text
+            : null,
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
         refundMethod: widget.transaction.paymentMethod.name.toUpperCase(),
+        managerOverride: _isOverdue ? _managerOverride : null,
+        exchangeItems: exchangeItems,
       );
 
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Request return berhasil dikirim!'),
+          SnackBar(
+            content: Text(
+              _isExchangeReason
+                  ? 'Request tukar barang berhasil dikirim!'
+                  : 'Request return berhasil dikirim!',
+            ),
             backgroundColor: AppColors.success,
           ),
         );
@@ -806,17 +1022,16 @@ class _ReturnBottomSheetState extends State<_ReturnBottomSheet> {
         context.read<TransactionProvider>().fetchTransactions();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      _showError('Gagal: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
+    );
   }
 
   @override
@@ -828,51 +1043,192 @@ class _ReturnBottomSheetState extends State<_ReturnBottomSheet> {
         right: 16,
         top: 16,
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
+      child: _isLoading
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : _errorMessage != null
+          ? _buildErrorView()
+          : _buildForm(),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 32),
+        Icon(
+          Icons.error_outline,
+          size: 64,
+          color: AppColors.error.withValues(alpha: 0.5),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          _errorMessage!,
+          style: const TextStyle(color: AppColors.textSecondary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Tutup'),
+        ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildForm() {
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Title
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Request Return / Tukar',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              if (_isOverdue)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'OVERDUE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Text(
+            widget.transaction.transactionNo,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+
+          // Overdue warning with manager override
+          if (_isOverdue) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber,
+                        color: AppColors.error,
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Return sudah melewati batas waktu',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _managerOverride,
+                        onChanged: (val) =>
+                            setState(() => _managerOverride = val ?? false),
+                        activeColor: AppColors.error,
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'Override Manager (lanjutkan return)',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Request Return',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              widget.transaction.transactionNo,
-              style: const TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
+          ],
 
-            // Items to return
-            const Text(
-              'Pilih Item & Jumlah',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 150),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: widget.transaction.items.length,
-                itemBuilder: (context, index) {
-                  final item = widget.transaction.items[index];
-                  final qty = _returnQuantities[item.productVariantId] ?? 0;
-                  return Container(
+          // Items to return
+          const Text(
+            'Pilih Item & Jumlah',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 180),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: widget.transaction.items.length,
+              itemBuilder: (context, index) {
+                final item = widget.transaction.items[index];
+                final returnableInfo = _returnableItems[item.productVariantId];
+                final maxQty = returnableInfo?.returnableQty ?? item.quantity;
+                final returnedQty = returnableInfo?.returnedQty ?? 0;
+                final isFullyReturned = maxQty <= 0;
+                final qty = _returnQuantities[item.productVariantId] ?? 0;
+
+                return Opacity(
+                  opacity: isFullyReturned ? 0.5 : 1.0,
+                  child: Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.background,
+                      color: isFullyReturned
+                          ? AppColors.background.withValues(alpha: 0.5)
+                          : AppColors.background,
                       borderRadius: BorderRadius.circular(10),
                       border: qty > 0
                           ? Border.all(color: AppColors.primary)
@@ -891,100 +1247,180 @@ class _ReturnBottomSheetState extends State<_ReturnBottomSheet> {
                                 ),
                               ),
                               Text(
-                                'Max: ${item.quantity} • ${CurrencyFormatter.format(item.price)}',
+                                'Max: $maxQty • ${CurrencyFormatter.format(item.price)}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textSecondary,
                                 ),
                               ),
+                              if (returnedQty > 0)
+                                Text(
+                                  'Sudah diretur: $returnedQty',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.warning.withValues(
+                                      alpha: 0.8,
+                                    ),
+                                  ),
+                                ),
+                              if (isFullyReturned)
+                                const Text(
+                                  '✓ Sudah diretur semua',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(
-                                Icons.remove_circle_outline,
-                                size: 24,
+                        if (!isFullyReturned)
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  size: 24,
+                                ),
+                                onPressed: qty > 0
+                                    ? () => setState(
+                                        () =>
+                                            _returnQuantities[item
+                                                    .productVariantId] =
+                                                qty - 1,
+                                      )
+                                    : null,
+                                color: AppColors.primary,
                               ),
-                              onPressed: qty > 0
-                                  ? () => setState(
-                                      () =>
-                                          _returnQuantities[item
-                                                  .productVariantId] =
-                                              qty - 1,
-                                    )
-                                  : null,
-                              color: AppColors.primary,
+                              Text(
+                                '$qty',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  size: 24,
+                                ),
+                                onPressed: qty < maxQty
+                                    ? () => setState(
+                                        () =>
+                                            _returnQuantities[item
+                                                    .productVariantId] =
+                                                qty + 1,
+                                      )
+                                    : null,
+                                color: AppColors.primary,
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Reason dropdown
+          const Text('Alasan', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<ReturnReasonType>(
+                value: _selectedReason,
+                isExpanded: true,
+                items: _availableReasons.map((reason) {
+                  final isExchange = [
+                    ReturnReasonType.wrongSize,
+                    ReturnReasonType.wrongItem,
+                    ReturnReasonType.defective,
+                    ReturnReasonType.expired,
+                  ].contains(reason);
+
+                  return DropdownMenuItem(
+                    value: reason,
+                    child: Row(
+                      children: [
+                        if (isExchange)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
                             ),
-                            Text(
-                              '$qty',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.info.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'TUKAR',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: AppColors.info,
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.add_circle_outline,
-                                size: 24,
-                              ),
-                              onPressed: qty < item.quantity
-                                  ? () => setState(
-                                      () =>
-                                          _returnQuantities[item
-                                                  .productVariantId] =
-                                              qty + 1,
-                                    )
-                                  : null,
-                              color: AppColors.primary,
-                            ),
-                          ],
-                        ),
+                          ),
+                        Expanded(child: Text(_getReasonLabel(reason))),
                       ],
                     ),
                   );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _selectedReason = value);
                 },
               ),
             ),
-            const SizedBox(height: 16),
+          ),
 
-            // Reason dropdown
-            const Text(
-              'Alasan Return',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+          // Exchange info
+          if (_isExchangeReason) ...[
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(10),
+                color: AppColors.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<ReturnReason>(
-                  value: _selectedReason,
-                  isExpanded: true,
-                  items: ReturnReason.values.map((reason) {
-                    return DropdownMenuItem(
-                      value: reason,
-                      child: Text(_getReasonLabel(reason)),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) setState(() => _selectedReason = value);
-                  },
-                ),
+              child: Row(
+                children: [
+                  const Icon(Icons.swap_horiz, color: AppColors.info, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _selectedReason == ReturnReasonType.wrongSize
+                          ? 'Tukar dengan varian lain dari produk yang sama'
+                          : _selectedReason == ReturnReasonType.wrongItem
+                          ? 'Tukar dengan produk lain'
+                          : 'Barang lama akan di-write off, diganti unit baru',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.info,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
+          ],
+          const SizedBox(height: 16),
 
-            // Notes
+          // Reason detail (for OTHER)
+          if (_selectedReason == ReturnReasonType.other) ...[
             TextField(
-              controller: _notesController,
+              controller: _reasonDetailController,
               maxLines: 2,
               decoration: InputDecoration(
-                hintText: 'Catatan tambahan (opsional)',
+                hintText: 'Jelaskan alasan return...',
                 filled: true,
                 fillColor: AppColors.background,
                 border: OutlineInputBorder(
@@ -994,60 +1430,86 @@ class _ReturnBottomSheetState extends State<_ReturnBottomSheet> {
               ),
             ),
             const SizedBox(height: 16),
+          ],
 
-            // Total refund
-            if (_hasItemsSelected)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Total Refund',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      CurrencyFormatter.format(_totalRefund),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: AppColors.warning,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 16),
-
-            // Submit button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitReturn,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.warning,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Kirim Request Return'),
+          // Notes
+          TextField(
+            controller: _notesController,
+            maxLines: 2,
+            decoration: InputDecoration(
+              hintText: 'Catatan tambahan (opsional)',
+              filled: true,
+              fillColor: AppColors.background,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
               ),
             ),
-            const SizedBox(height: 16),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+
+          // Total refund
+          if (_hasItemsSelected)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _isExchangeReason
+                    ? AppColors.info.withValues(alpha: 0.1)
+                    : AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _isExchangeReason ? 'Nilai Tukar' : 'Total Refund',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    CurrencyFormatter.format(_totalRefund),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: _isExchangeReason
+                          ? AppColors.info
+                          : AppColors.warning,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+
+          // Submit button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _submitReturn,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isExchangeReason
+                    ? AppColors.info
+                    : AppColors.warning,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      _isExchangeReason
+                          ? 'Kirim Request Tukar'
+                          : 'Kirim Request Return',
+                    ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }

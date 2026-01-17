@@ -1,6 +1,11 @@
 class ApiConstants {
-  // Base URL - Production API (VPS)
-  static const String baseUrl = 'https://api-pelaris.ziqrishahab.com/api';
+  // Base URL - configurable via --dart-define=API_BASE_URL=...
+  // Production: https://api-pelaris.ziqrishahab.com/api
+  // Dev: http://localhost:5100/api
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://api-pelaris.ziqrishahab.com/api',
+  );
 
   // Auth endpoints
   static const String login = '/auth/login';
@@ -31,6 +36,7 @@ class ApiConstants {
 
   // Settings endpoints
   static const String settings = '/settings';
+  static const String settingsApp = '/settings/app';
   static const String printerSettings = '/settings/printer';
 
   // Channels endpoints

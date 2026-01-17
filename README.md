@@ -11,6 +11,7 @@ Mobile POS App untuk Pelaris.id omnichannel retail system (Android).
 ## Features
 
 - **Real-time Sync** - WebSocket auto-refresh product & stock dari web dashboard
+- **Multi-Tenant Support** - Automatic tenant scoping via JWT token
 - **Multi-Branch Support** - Owner/Manager dapat pilih cabang, dengan persistensi pilihan
 - **Smart Login Flow** - Automatic branch selection saat app startup untuk multi-tenant users
 - Product search & barcode scanning (mobile_scanner)
@@ -82,11 +83,21 @@ Output: `build/app/outputs/flutter-apk/app-release.apk`
 
 ## Configuration
 
-Backend API URL sudah hardcoded ke production server:
-- API: `https://api.Pelaris.id.ziqrishahab.com/api`
-- WebSocket: `https://api.Pelaris.id.ziqrishahab.com`
+Backend API URL dapat dikonfigurasi via `--dart-define`:
 
-Untuk development, edit di:
+```bash
+# Development
+flutter run --dart-define=API_BASE_URL=http://localhost:5100/api --dart-define=SOCKET_URL=http://localhost:5100
+
+# Production
+flutter build apk --release --dart-define=API_BASE_URL=https://api.pelaris.id/api --dart-define=SOCKET_URL=https://api.pelaris.id
+```
+
+Default values (jika tidak di-set):
+- API: `http://localhost:5100/api`
+- WebSocket: `http://localhost:5100`
+
+Untuk hardcode (tidak disarankan), edit:
 - `lib/core/constants/api_constants.dart` (HTTP API)
 - `lib/core/services/socket_service.dart` (WebSocket URL)
 
@@ -111,6 +122,13 @@ App membutuhkan permissions berikut:
 Project di D: drive, pub cache di C: drive menyebabkan Kotlin compiler error saat build. Sudah di-workaround dengan `kotlin.incremental=false` di `android/gradle.properties`. Build tetap berhasil meskipun ada error log.
 
 ## Changelog
+
+### 2026-01-15
+**Multi-Tenant & Configuration:**
+- Updated API configuration to use `--dart-define` for environment-based URLs
+- Removed hardcoded production URLs (now configurable per build)
+- Default to localhost for development safety
+- Multi-tenant support via JWT token tenantId
 
 ### 2026-01-13
 - **Multi-Branch Support**: Added branch selection for Owner/Manager roles with SharedPreferences persistence

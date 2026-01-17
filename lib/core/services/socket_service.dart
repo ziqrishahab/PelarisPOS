@@ -7,16 +7,39 @@ class SocketService {
 
   io.Socket? _socket;
   bool _isConnected = false;
+  String? _authToken;
 
-  // Socket.io server URL
-  static const String _serverUrl = 'https://api-pelaris.ziqrishahab.com';
+  // Socket.io server URL - configurable via --dart-define=SOCKET_URL=...
+  // Production: https://api-pelaris.ziqrishahab.com
+  // Dev: http://localhost:5100
+  static const String _serverUrl = String.fromEnvironment(
+    'SOCKET_URL',
+    defaultValue: 'https://api-pelaris.ziqrishahab.com',
+  );
 
   bool get isConnected => _isConnected;
 
-  // Initialize and connect to socket
+  /// Set authentication token (call this after login)
+  void setAuthToken(String? token) {
+    _authToken = token;
+    // If already connected, reconnect with new token
+    if (_socket != null && token != null) {
+      print('[Socket] Auth token updated, reconnecting...');
+      disconnect();
+      connect();
+    }
+  }
+
+  /// Initialize and connect to socket with authentication
   void connect() {
     if (_socket != null && _socket!.connected) {
       print('[Socket] Already connected');
+      return;
+    }
+
+    // Require auth token for connection
+    if (_authToken == null || _authToken!.isEmpty) {
+      print('[Socket] No auth token available, skipping socket connection');
       return;
     }
 
@@ -28,11 +51,13 @@ class SocketService {
       'reconnectionDelay': 1000,
       'reconnectionDelayMax': 5000,
       'timeout': 10000,
+      // Send authentication token
+      'auth': {'token': _authToken},
     });
 
     _socket!.onConnect((_) {
       _isConnected = true;
-      print('[Socket] Connected to server');
+      print('[Socket] Connected to server (authenticated)');
     });
 
     _socket!.onDisconnect((_) {
@@ -41,7 +66,15 @@ class SocketService {
     });
 
     _socket!.onConnectError((error) {
-      print('[Socket] Connection error: $error');
+      final errorMsg = error.toString();
+      print('[Socket] Connection error: $errorMsg');
+
+      // Check if authentication error
+      if (errorMsg.contains('Authentication required') ||
+          errorMsg.contains('Invalid or expired token')) {
+        print('[Socket] Authentication failed, disconnecting...');
+        disconnect();
+      }
     });
 
     _socket!.onError((error) {
@@ -88,6 +121,7 @@ class SocketService {
   void disconnect() {
     if (_socket != null) {
       _socket!.disconnect();
+      _socket!.dispose();
       _socket = null;
       _isConnected = false;
       print('[Socket] Disconnected and cleaned up');
@@ -96,6 +130,7 @@ class SocketService {
 
   // Dispose (untuk cleanup saat app close)
   void dispose() {
+    _authToken = null;
     disconnect();
   }
 }
