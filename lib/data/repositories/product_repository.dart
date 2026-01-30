@@ -12,7 +12,9 @@ class ProductRepository {
   Future<List<Category>> getCategories() async {
     try {
       final response = await _apiClient.get(ApiConstants.categories);
-      final List<dynamic> data = response.data;
+      // backend may return either a direct array or a paginated object { data: [...], pagination: {...} }
+      final dynamic raw = response.data;
+      final List<dynamic> data = raw is List ? raw : (raw['data'] ?? []);
       return data.map((json) => Category.fromJson(json)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -35,7 +37,8 @@ class ProductRepository {
         ApiConstants.products,
         queryParameters: queryParams,
       );
-      final List<dynamic> data = response.data;
+      final dynamic raw = response.data;
+      final List<dynamic> data = raw is List ? raw : (raw['data'] ?? []);
       return data.map((json) => Product.fromJson(json)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -59,7 +62,8 @@ class ProductRepository {
         ApiConstants.products,
         queryParameters: {'search': sku},
       );
-      final List<dynamic> data = response.data;
+      final dynamic raw = response.data;
+      final List<dynamic> data = raw is List ? raw : (raw['data'] ?? []);
       if (data.isEmpty) return null;
 
       // Find exact SKU match
